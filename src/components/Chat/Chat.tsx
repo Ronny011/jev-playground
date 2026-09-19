@@ -1,6 +1,7 @@
 import * as React from "react";
-import { choice, type SystemOneResult } from "@typesafe-ai/sdk";
-import { IconSend } from "@tabler/icons-react";
+import { choice, TypeSafeClient } from "@typesafe-ai/sdk";
+import { IconChevronRight, IconSend } from "@tabler/icons-react";
+import { Badge } from "../../../@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MessageAnimated } from "@/components/message-animated";
@@ -17,6 +18,12 @@ import {
 
 //? interesting use case - nested choice - a choice wrapper that decides wether to call choice, score or noul
 
+const typeSafeClient = new TypeSafeClient({
+  apiKey: import.meta.env.VITE_SYSTEM_ONE_API_KEY,
+  baseURL: "/api",
+  dangerouslyAllowBrowser: true,
+});
+
 async function classifyMessage(document: string, mode: ChatMode) {
   const categoryChoices = Object.fromEntries(
     chatConfig[mode].categories.map((category) => [category, null]),
@@ -28,17 +35,10 @@ async function classifyMessage(document: string, mode: ChatMode) {
   const questions = {
     category: choice(question, categoryChoices),
   };
-  const response = await fetch("/api/v1/systemone", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ state: { document }, questions }),
+  const result = await typeSafeClient.systemOne({
+    state: { document },
+    questions,
   });
-
-  if (!response.ok) {
-    throw new Error("Failed to classify message.");
-  }
-
-  const result = (await response.json()) as SystemOneResult<typeof questions>;
 
   return result.answers.category.choice;
 }
@@ -50,17 +50,22 @@ interface Message {
 }
 
 export const Chat = () => {
+  const inputReference = React.useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = React.useState("");
   const [mode, setMode] = React.useState<ChatMode>("tickets");
   const [messages, setMessages] = React.useState<Message[]>([
     {
       id: crypto.randomUUID(),
       role: "assistant",
-      content: chatConfig.tools.title,
+      content: chatConfig[mode].title,
     },
   ]);
   const [isPending, setIsPending] = React.useState(false);
   const activeConfig = chatConfig[mode];
+
+  React.useEffect(() => {
+    if (!isPending) inputReference.current?.focus();
+  }, [isPending]);
 
   const handleModeChange = (nextMode: ChatMode) => {
     setMode(nextMode);
@@ -113,14 +118,22 @@ export const Chat = () => {
 
   return (
     <section className="flex h-[min(600px,calc(100svh-2rem))] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm">
-      <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-        <div className="text-left">
-          <h1 className="font-semibold text-white!">Chat</h1>
-          <p className="text-xs text-muted-foreground">
-            {activeConfig.subtitle}
-          </p>
+      <header className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-4 py-3">
+        <div className="min-w-0 flex-1 text-left">
+          <h1 className="font-semibold">{activeConfig.header}</h1>
+          <p className="text-xs text-foreground">{activeConfig.subtitle}</p>
+          <div
+            className="mt-2 flex flex-wrap gap-1.5"
+            aria-label="Available options"
+          >
+            {activeConfig.categories.map((category) => (
+              <Badge key={category} variant="outline">
+                {category.replaceAll("_", " ")}
+              </Badge>
+            ))}
+          </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           <ChatModeToggle
             mode={mode}
             onModeChange={handleModeChange}
@@ -164,19 +177,27 @@ export const Chat = () => {
 
       <footer className="shrink-0 border-t border-border p-3">
         <form className="flex items-center gap-2" onSubmit={handleSubmit}>
-          <Input
-            autoFocus
-            placeholder="Type a message..."
-            value={inputValue}
-            onChange={(event) => setInputValue(event.target.value)}
-            disabled={isPending}
-            className="flex-1"
-          />
+          <div className="relative flex-1">
+            <IconChevronRight
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-foreground"
+            />
+            <Input
+              ref={inputReference}
+              autoFocus
+              aria-label="Message"
+              value={inputValue}
+              onChange={(event) => setInputValue(event.target.value)}
+              disabled={isPending}
+              className="pl-7 font-mono caret-foreground"
+            />
+          </div>
           <Button
             type="submit"
             size="icon"
             disabled={isPending}
             aria-label="Send message"
+            variant="ghost"
           >
             <IconSend />
           </Button>

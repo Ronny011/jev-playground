@@ -31,8 +31,8 @@ function MessageAnimated({
         className={cn(
           "max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
           isUser
-            ? "rounded-br-sm bg-primary text-primary-foreground shadow-sm"
-            : "rounded-bl-sm border border-border bg-secondary text-left text-secondary-foreground",
+            ? "rounded-br-sm bg-transparent text-foreground"
+            : "rounded-bl-sm border border-border bg-transparent text-left text-foreground",
         )}
       >
         {isPending ? (

@@ -1,6 +1,7 @@
 export const chatConfig = {
   tickets: {
-    title: "Hello, I am JEV! Let's direct you to the correct support team",
+    header: "Support chat",
+    title: "Let's direct you to the correct support team",
     subtitle: "Ask anything, and get directed to the right team",
     categories: [
       "billing",
@@ -13,8 +14,8 @@ export const chatConfig = {
     ],
   },
   tools: {
-    title:
-      "Hello, I am Muse routing node! Let's route your request to the correct tool",
+    header: "Muse routing node",
+    title: "Let's route your request to the correct tool",
     subtitle: "Type any prompt and get routed to the right mcp tool",
     categories: [
       "add_to_cart",
