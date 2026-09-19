@@ -51,7 +51,7 @@ interface Message {
 
 export const Chat = () => {
   const [inputValue, setInputValue] = React.useState("");
-  const [mode, setMode] = React.useState<ChatMode>("tools");
+  const [mode, setMode] = React.useState<ChatMode>("tickets");
   const [messages, setMessages] = React.useState<Message[]>([
     {
       id: crypto.randomUUID(),
