@@ -32,7 +32,7 @@ function MessageAnimated({
           "max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
           isUser
             ? "rounded-br-sm bg-primary text-primary-foreground shadow-sm"
-            : "rounded-bl-sm border border-border bg-secondary text-secondary-foreground",
+            : "rounded-bl-sm border border-border bg-secondary text-left text-secondary-foreground",
         )}
       >
         {isPending ? (

@@ -1,9 +1,11 @@
 import * as React from "react";
-import { choice, TypeSafeClient } from "@typesafe-ai/sdk";
+import { choice, type SystemOneResult } from "@typesafe-ai/sdk";
 import { IconSend } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MessageAnimated } from "@/components/message-animated";
+import { ChatModeToggle, type ChatMode } from "@/components/ChatModeToggle";
+import { chatConfig } from "@/components/Chat/Chat.config";
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -15,48 +17,30 @@ import {
 
 //? interesting use case - nested choice - a choice wrapper that decides wether to call choice, score or noul
 
-const client = new TypeSafeClient({
-  apiKey: import.meta.env.VITE_SYSTEM_ONE_API_KEY,
-  baseURL: "/api",
-  dangerouslyAllowBrowser: true,
-});
-
-async function classifyMessage(document: string) {
-  const response = await client.systemOne({
-    state: { document },
-    questions: {
-      category: choice("What tool should I invoke?", {
-        billing: null,
-        technical: null,
-        other: null,
-        sales: null,
-        accounting: null,
-        legal: null,
-        logistics: null,
-      }),
-    },
+async function classifyMessage(document: string, mode: ChatMode) {
+  const categoryChoices = Object.fromEntries(
+    chatConfig[mode].categories.map((category) => [category, null]),
+  );
+  const question =
+    mode === "tickets"
+      ? "Which support team should handle this request?"
+      : "What tool should I invoke?";
+  const questions = {
+    category: choice(question, categoryChoices),
+  };
+  const response = await fetch("/api/v1/systemone", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ state: { document }, questions }),
   });
 
-  return response.answers.category.choice;
-}
-
-function responseForCategory(category: string) {
-  switch (category) {
-    case "billing":
-      return "I think this is a **billing** question. I will route you to our billing team.";
-    case "technical":
-      return "I think this is a **technical** issue. Let me help troubleshoot it.";
-    case "sales":
-      return "I think this is a **sales** question. I will route you to our sales team.";
-    case "accounting":
-      return "I think this is a **accounting** question. I will route you to our accounting team.";
-    case "legal":
-      return "I think this is a **legal** question. I will route you to our legal team.";
-    case "logistics":
-      return "I think this is a **logistics** question. I will route you to our logistics team.";
-    default:
-      return "I think this is **other**. Can you tell me a bit more?";
+  if (!response.ok) {
+    throw new Error("Failed to classify message.");
   }
+
+  const result = (await response.json()) as SystemOneResult<typeof questions>;
+
+  return result.answers.category.choice;
 }
 
 interface Message {
@@ -67,14 +51,28 @@ interface Message {
 
 export const Chat = () => {
   const [inputValue, setInputValue] = React.useState("");
+  const [mode, setMode] = React.useState<ChatMode>("tools");
   const [messages, setMessages] = React.useState<Message[]>([
     {
-      id: "1",
+      id: crypto.randomUUID(),
       role: "assistant",
-      content: "Hello, I am JEV! Let's route your request to the correct tool",
+      content: chatConfig.tools.title,
     },
   ]);
   const [isPending, setIsPending] = React.useState(false);
+  const activeConfig = chatConfig[mode];
+
+  const handleModeChange = (nextMode: ChatMode) => {
+    setMode(nextMode);
+    setInputValue("");
+    setMessages([
+      {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: chatConfig[nextMode].title,
+      },
+    ]);
+  };
 
   const handleSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -93,14 +91,14 @@ export const Chat = () => {
     setMessages((previous) => [...previous, userMessage]);
 
     try {
-      const category = await classifyMessage(content);
+      const category = await classifyMessage(content, mode);
       const assistantMessage = {
         id: crypto.randomUUID(),
         role: "assistant" as const,
-        content: responseForCategory(category),
+        content: category,
       };
       setMessages((previous) => [...previous, assistantMessage]);
-    } catch (error) {
+    } catch {
       const assistantMessage = {
         id: crypto.randomUUID(),
         role: "assistant" as const,
@@ -117,12 +115,19 @@ export const Chat = () => {
     <section className="flex h-[min(600px,calc(100svh-2rem))] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm">
       <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
         <div className="text-left">
-          <h1 className="font-semibold text-white!">Routing node chat</h1>
+          <h1 className="font-semibold text-white!">Chat</h1>
           <p className="text-xs text-muted-foreground">
-            Ask anything, and get routed to the right team
+            {activeConfig.subtitle}
           </p>
         </div>
-        <div className="flex h-2 w-2 rounded-full bg-emerald-500" />
+        <div className="flex items-center gap-3">
+          <ChatModeToggle
+            mode={mode}
+            onModeChange={handleModeChange}
+            disabled={isPending}
+          />
+          <div className="h-2 w-2 rounded-full bg-emerald-500" />
+        </div>
       </header>
 
       <div className="flex-1 min-h-0">

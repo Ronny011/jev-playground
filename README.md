@@ -33,3 +33,9 @@ If you are developing a production application, we recommend enabling type-aware
 ```
 
 See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+
+## Netlify deployment
+
+Set `SYSTEM_ONE_API_KEY` in the Netlify site's environment variables. The browser sends System One requests to `/api/v1/systemone`, which Netlify routes through the server function so the API key is never included in the client bundle.
+
+For local Vite development, add `SYSTEM_ONE_API_KEY` to `.env`. The Vite development proxy supplies it to the TypeSafe API without exposing it to browser code.
