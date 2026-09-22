@@ -24,23 +24,35 @@ const typeSafeClient = new TypeSafeClient({
   dangerouslyAllowBrowser: true,
 });
 
-async function classifyMessage(document: string, mode: ChatMode) {
-  const categoryChoices = Object.fromEntries(
-    chatConfig[mode].categories.map((category) => [category, null]),
-  );
+async function classifyMessage(document: string, mode: ChatMode, n = 1) {
+  if (!Number.isInteger(n) || n < 1) {
+    throw new RangeError("The number of choices must be a positive integer.");
+  }
+
+  const remainingChoices = new Set(chatConfig[mode].categories);
+  const categories: string[] = [];
   const question =
     mode === "tickets"
       ? "Which support team should handle this request?"
       : "What tool should I invoke?";
-  const questions = {
-    category: choice(question, categoryChoices),
-  };
-  const result = await typeSafeClient.systemOne({
-    state: { document },
-    questions,
-  });
+  while (categories.length < n && remainingChoices.size > 0) {
+    const categoryChoices = Object.fromEntries(
+      Array.from(remainingChoices, (category) => [category, null]),
+    );
+    const result = await typeSafeClient.systemOne({
+      state: { document },
+      questions: {
+        category: choice(question, categoryChoices),
+      },
+    });
+    const category = result.answers.category.choice;
+    if (!remainingChoices.delete(category)) {
+      throw new Error("The classifier returned an unavailable choice.");
+    }
+    categories.push(category);
+  }
 
-  return result.answers.category.choice;
+  return categories;
 }
 
 interface Message {
@@ -96,11 +108,11 @@ export const Chat = () => {
     setMessages((previous) => [...previous, userMessage]);
 
     try {
-      const category = await classifyMessage(content, mode);
+      const categories = await classifyMessage(content, mode, 2);
       const assistantMessage = {
         id: crypto.randomUUID(),
         role: "assistant" as const,
-        content: category,
+        content: categories.join(", "),
       };
       setMessages((previous) => [...previous, assistantMessage]);
     } catch {
